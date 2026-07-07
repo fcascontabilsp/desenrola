@@ -769,11 +769,10 @@
   }));
 
   // Free qualification form -> routes lead to WhatsApp with prefilled context (#2, #3, #13)
-  // CONFIGURE AQUI: cole a URL do seu webhook de entrada do Bitrix24 (Configurações > Webhooks > Webhook de entrada,
-  // método crm.lead.add) para que os leads também sejam criados automaticamente no seu CRM.
-  // Deixe como null para enviar o lead apenas por WhatsApp (comportamento atual).
-  // Ex.: 'https://SEUDOMINIO.bitrix24.com.br/rest/1/xxxxxxxxxxxxxxxx/crm.lead.add.json'
-  const BITRIX24_WEBHOOK_URL = null;
+  // Envia o lead para um cenário do Make, que faz a deduplicação e cria Contato + Negócio no Bitrix24.
+  // A URL abaixo é pública por natureza (webhook de entrada do Make) e não concede acesso de leitura/escrita
+  // ao Bitrix24 — o token real do Bitrix fica guardado dentro do cenário do Make, nunca aqui no front-end.
+  const BITRIX24_WEBHOOK_URL = 'https://hook.us2.make.com/gg0i9fojmirqgnnb7vgwhhm6urovk5eu';
 
   async function sendLeadToBitrix24(lead){
     if(!BITRIX24_WEBHOOK_URL) return;
@@ -782,17 +781,16 @@
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({
-          fields: {
-            TITLE: 'Lead Desenrola MEI - ' + lead.nome,
-            NAME: lead.nome,
-            PHONE: [{VALUE: lead.whats, VALUE_TYPE: 'WORK'}],
-            COMMENTS: `Faixa da dívida: ${lead.valor}\nAcordo rescindido nos últimos 2 anos: ${lead.acordo}\nConsentimento LGPD: sim`,
-            SOURCE_ID: 'WEB'
-          }
+          nome: lead.nome,
+          whats: lead.whats,
+          valor: lead.valor,
+          acordo: lead.acordo,
+          campanha: 'desenrola-mei-2026',
+          pagina_origem: window.location.href
         })
       });
     }catch(e){
-      console.error('Falha ao enviar lead para o Bitrix24:', e);
+      console.error('Falha ao enviar lead para o Make/Bitrix24:', e);
     }
   }
 
