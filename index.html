@@ -775,42 +775,61 @@
   const BITRIX24_WEBHOOK_URL = 'https://hook.us2.make.com/gg0i9fojmirqgnnb7vgwhhm6urovk5eu';
 
   async function sendLeadToBitrix24(lead){
-    if(!BITRIX24_WEBHOOK_URL) return;
-    try{
-      await fetch(BITRIX24_WEBHOOK_URL, {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-          nome: lead.nome,
-          whats: lead.whats,
-          valor: lead.valor,
-          acordo: lead.acordo,
-          campanha: 'desenrola-mei-2026',
-          pagina_origem: window.location.href
-        })
-      });
-    }catch(e){
-      console.error('Falha ao enviar lead para o Make/Bitrix24:', e);
+    if(!BITRIX24_WEBHOOK_URL) throw new Error('Webhook do Make não configurado.');
+
+    const response = await fetch(BITRIX24_WEBHOOK_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        origem: 'desenrola-mei-2026',
+        nome: lead.nome,
+        whats: lead.whats,
+        valor: lead.valor,
+        acordo: lead.acordo,
+        campanha: 'desenrola-mei-2026',
+        pagina_origem: window.location.href,
+        data_hora: new Date().toISOString()
+      })
+    });
+
+    if(!response.ok){
+      throw new Error(`Webhook respondeu HTTP ${response.status}.`);
     }
   }
 
-  document.getElementById('qSubmit').addEventListener('click', ()=>{
+  document.getElementById('qSubmit').addEventListener('click', async ()=>{
     const nome = document.getElementById('qNome').value.trim();
-    const whats = document.getElementById('qWhats').value.trim();
+    const whatsInformado = document.getElementById('qWhats').value.trim();
+    const digitos = whatsInformado.replace(/\D/g, '');
+    const whats = digitos.startsWith('55') && digitos.length >= 12 ? digitos.slice(2) : digitos;
     const valor = document.getElementById('qValor').value;
     const acordo = document.getElementById('qAcordo').value;
     const consent = document.getElementById('qConsent').checked;
-    if(!nome || !whats){
-      alert('Preencha seu nome e WhatsApp para continuar.');
+
+    if(!nome || !/^\d{10,11}$/.test(whats)){
+      alert('Preencha seu nome e um WhatsApp válido com DDD.');
       return;
     }
     if(!consent){
       alert('Para continuar, confirme a autorização de uso dos seus dados (LGPD).');
       return;
     }
-    sendLeadToBitrix24({nome, whats, valor, acordo});
-    const msg = `Olá! Quero saber se me qualifico para o Desenrola MEI.%0ANome: ${encodeURIComponent(nome)}%0AWhatsApp: ${encodeURIComponent(whats)}%0AFaixa da dívida: ${encodeURIComponent(valor)}%0AAcordo rescindido nos últimos 2 anos: ${encodeURIComponent(acordo)}`;
-    window.open(`https://wa.me/551640423254?text=${msg}`, '_blank');
+
+    const btn = document.getElementById('qSubmit');
+    const textoOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+
+    try{
+      await sendLeadToBitrix24({nome, whats, valor, acordo});
+      const msg = `Olá! Quero saber se me qualifico para o Desenrola MEI.%0ANome: ${encodeURIComponent(nome)}%0AWhatsApp: ${encodeURIComponent(whats)}%0AFaixa da dívida: ${encodeURIComponent(valor)}%0AAcordo rescindido nos últimos 2 anos: ${encodeURIComponent(acordo)}`;
+      window.location.href = `https://wa.me/551640423254?text=${msg}`;
+    }catch(e){
+      console.error('Falha ao enviar lead para o Make/Bitrix24:', e);
+      alert('Não foi possível registrar seus dados agora. Tente novamente em alguns instantes.');
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
+    }
   });
 
   // FAQ data & accordion
